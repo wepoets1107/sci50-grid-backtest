@@ -116,6 +116,26 @@ td{{padding:6px 10px;border-bottom:1px solid #1e2d3d}}
 <tr><td>2026-04-10</td><td><span class="bdg b">买入</span></td><td>1.437</td><td>28,300</td></tr>
 <tr><td>2026-04-14</td><td><span class="bdg b">买入</span></td><td>1.479</td><td>41,300</td></tr></table></div>
 <div class="rf">GitHub: wepoets1107/sci50-grid-backtest | {td}</div>
+
+<div class="sb"><h2>策略说明</h2>
+<div class="rd">
+<p><b>递进仓位 (MA趋势渐进出清)</b> — 均线主逻辑+布林带调节乘数+MA动量加速加仓</p>
+<br><b>仓位档位</b>
+<ul>
+<li><b class="g">满仓 90%</b> 双多头(MA5>MA20+MA10>MA20)+MA5领先MA10</li>
+<li><b class="g">重仓 70%</b> 双多头+MA5≤MA10</li>
+<li style="color:#f0c040"><b>半仓 40%</b> 短多长平</li>
+<li><b style="color:#e74c3c">空仓 0%</b> MA5≤MA20 空头出清</li>
+</ul>
+<br><b>因子调节</b>
+<ul>
+<li>布林带乘数: 上轨×0.80 / 中轨下方×0.90 / 下轨且多头×1.15</li>
+<li>MA动量加仓: MA5偏离MA20>8%加15% / >3%加10% / >1%加5%</li>
+</ul>
+<br><b>过滤</b> 初始上限60% | 确认≥1天 | 量比<0.8暂缓 | 震荡市≤50%<br>
+<b>回测</b> 科创50指数(000688), 2020-01 ~ 2026-05, 7年<br>
+<b>操作</b> python3 ma_trend.py 查看当前信号
+</div></div>
 </div></body></html>'''
     with open(os.path.join(ODIR,"index.html"),"w",encoding="utf-8") as f: f.write(html)
     print("OK")
