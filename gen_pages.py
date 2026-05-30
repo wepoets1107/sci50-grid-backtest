@@ -7,8 +7,7 @@ import numpy as np, pandas as pd, akshare as ak
 import matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt; import matplotlib.dates as mdates
 import ma_trend; from importlib import reload; reload(ma_trend)
-
-CAP=100000
+CAP=100000; ODIR=os.path.dirname(os.path.abspath(__file__))
 
 def main():
     df=ak.stock_zh_index_daily(symbol='sh000688')
@@ -34,10 +33,10 @@ def main():
     buf=io.BytesIO(); fig.savefig(buf,format="png",dpi=130,bbox_inches="tight"); plt.close()
     img=base64.b64encode(buf.getvalue()).decode()
 
-    m5v=pd.Series(c).rolling(5).mean().iloc[-1]; m10v=pd.Series(c).rolling(10).mean().iloc[-1]; m20v=pd.Series(c).rolling(20).mean().iloc[-1]
-    cs=pd.Series(c); lp=c[-1]; bf=m5v>m20v and m10v>m20v; bh=m5v>m20v and m10v<=m20v
-    b=0.9 if(bf and m5v>m10v)else(0.7 if bf else(0.4 if bh else 0))
+    cs=pd.Series(c); lp=c[-1]; m5v=cs.rolling(5).mean().iloc[-1]; m10v=cs.rolling(10).mean().iloc[-1]; m20v=cs.rolling(20).mean().iloc[-1]
     bu=m20v+2*cs.rolling(20).std().iloc[-1]; bl=m20v-2*cs.rolling(20).std().iloc[-1]; bw=(bu-bl)/m20v
+    bf=m5v>m20v and m10v>m20v; bh=m5v>m20v and m10v<=m20v
+    b=0.9 if(bf and m5v>m10v)else(0.7 if bf else(0.4 if bh else 0))
     bm=1.0
     if lp>=bu: bm=0.8
     elif lp<=bl: bm=1.15 if(bf or bh)else 0.85
@@ -118,7 +117,7 @@ td{{padding:6px 10px;border-bottom:1px solid #1e2d3d}}
 <tr><td>2026-04-14</td><td><span class="bdg b">买入</span></td><td>1.479</td><td>41,300</td></tr></table></div>
 <div class="rf">GitHub: wepoets1107/sci50-grid-backtest | {td}</div>
 </div></body></html>'''
-    with open("index.html","w",encoding="utf-8") as f: f.write(html)
+    with open(os.path.join(ODIR,"index.html"),"w",encoding="utf-8") as f: f.write(html)
     print("OK")
 
 if __name__=="__main__":
