@@ -1,19 +1,61 @@
 #!/usr/bin/env python3
-"""生成Pages看板"""
+"""生成Pages看板 — 独立版（不依赖ma_trend）"""
 import sys, os, base64, io
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from datetime import datetime
 import numpy as np, pandas as pd, akshare as ak
 import matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt; import matplotlib.dates as mdates
-import ma_trend; from importlib import reload; reload(ma_trend)
-CAP=100000; ODIR=os.path.dirname(os.path.abspath(__file__))
+
+CAP=100000; COM=0.0001; SLI=0.0002; IC=0.60; CD=1; TT=0.10
+
+def ct(p,m5,m10,m20,bu,bl,bf,bh,bw):
+    b=0.9 if(bf and m5>m10)else(0.7 if bf else(0.4 if bh else 0.0))
+    bm=1.0
+    if p>=bu: bm=0.8
+    elif p<=bl: bm=1.15 if(bf or bh)else 0.85
+    elif p<=m20: bm=0.9
+    mo=0.0
+    if bf or bh:
+        dv=(m5-m20)/max(m20,1e-8)
+        if dv>0.08: mo=0.15
+        elif dv>0.03: mo=0.10
+        elif dv>0.01: mo=0.05
+    t=b*bm+mo; t=max(0,min(1,t))
+    if bw<0.12: t=min(t,0.5)
+    return t,b,bm,mo
+
+def bt(c,v=None):
+    n=len(c); m5=pd.Series(c).rolling(5).mean().values; m10=pd.Series(c).rolling(10).mean().values; m20=pd.Series(c).rolling(20).mean().values
+    s=pd.Series(c).rolling(20).std().values; bu=m20+2*s; bl=m20-2*s; bw=(bu-bl)/m20
+    vma=pd.Series(v).rolling(20).mean().values if v is not None else np.ones(n)*1e8
+    ca=CAP; ho=0; fi=False; bd=0; sg=[]; bc=0; sc=0; dc=[CAP]; dh=[0]
+    for i in range(n):
+        p=c[i]; pr=ho*p/max(ca+ho*p,1) if ca+ho*p>0 else 0
+        if i<20:
+            if i==0: val=ca*0.3; sh=int(val/p/100)*100
+            if sh>=100: ca-=sh*p*(1+COM+SLI); ho+=sh
+            dc.append(ca); dh.append(ho); continue
+        bf=m5[i]>m20[i] and m10[i]>m20[i]; bh=m5[i]>m20[i] and m10[i]<=m20[i]; ld=m5[i]>m10[i]
+        t,b2,bm,mo=ct(p,m5[i],m10[i],m20[i],bu[i],bl[i],bf,bh,bw[i])
+        bd=bd+1 if bf else 0; e=t if fi else min(t,IC)
+        if bf and bd<CD: e=min(e,0.4 if not fi else 0.7)
+        vOK=v[i]/vma[i]>=0.8 if(v is not None and vma[i]>0)else True
+        if e>pr+TT and ca>CAP*0.03 and vOK:
+            tv=ca+ho*p; ts=int(e*tv/p/100)*100; bs2=max(100,min(ts-ho,int(ca/p/100)*100))
+            if bs2>=100: ca-=bs2*p*(1+COM+SLI); ho+=bs2; fi=True; bc+=1; sg.append((i,f"B{int(e*100)}"))
+        if b2<=0 and ho>0:
+            ca+=ho*p*(1-COM-SLI); ho=0; bd=0; sc+=1; sg.append((i,"SA"))
+        dc.append(ca); dh.append(ho)
+    nv=np.array([dc[j+1]+dh[j+1]*c[j] for j in range(n)])
+    tr=(nv[-1]-CAP)/CAP; bhr=(c[-1]-c[0])/c[0]; pk=np.maximum.accumulate(nv); mn=np.max((pk-nv)/pk*100)
+    pk2=np.maximum.accumulate(c); mb=np.max((pk2-c)/pk2*100)
+    return {"nav":nv,"ret":tr,"mdd_n":mn,"mdd_b":mb,"bh":bhr,"excess":tr-bhr,"buys":bc,"sells":sc,"sigs":sg}
 
 def main():
     df=ak.stock_zh_index_daily(symbol='sh000688')
     df['date']=pd.to_datetime(df['date']); df=df[df['date']>='2020-01-01']
     c=df['close'].values; v=df['volume'].values*1000; d=df['date'].values
-    r=ma_trend.backtest(c,v)
+    r=bt(c,v)
     print(f"收益:{r['ret']:.1%} ETF:{r['bh']:.1%}")
 
     fig,(a1,a2)=plt.subplots(2,1,figsize=(12,6.5),gridspec_kw={"height_ratios":[3,1]})
@@ -115,8 +157,6 @@ td{{padding:6px 10px;border-bottom:1px solid #1e2d3d}}
 <tr><td>2026-02-03</td><td><span class="bdg s">清仓</span></td><td>1.548</td><td>41,600</td></tr>
 <tr><td>2026-04-10</td><td><span class="bdg b">买入</span></td><td>1.437</td><td>28,300</td></tr>
 <tr><td>2026-04-14</td><td><span class="bdg b">买入</span></td><td>1.479</td><td>41,300</td></tr></table></div>
-<div class="rf">GitHub: wepoets1107/sci50-grid-backtest | {td}</div>
-
 <div class="sb"><h2>策略说明</h2>
 <div class="rd">
 <p><b>递进仓位 (MA趋势渐进出清)</b> — 均线主逻辑+布林带调节乘数+MA动量加速加仓</p>
@@ -136,8 +176,9 @@ td{{padding:6px 10px;border-bottom:1px solid #1e2d3d}}
 <b>回测</b> 科创50指数(000688), 2020-01 ~ 2026-05, 7年<br>
 <b>操作</b> python3 ma_trend.py 查看当前信号
 </div></div>
+<div class="rf">GitHub: wepoets1107/sci50-grid-backtest | {td}</div>
 </div></body></html>'''
-    with open(os.path.join(ODIR,"index.html"),"w",encoding="utf-8") as f: f.write(html)
+    with open("index.html","w",encoding="utf-8") as f: f.write(html)
     print("OK")
 
 if __name__=="__main__":
