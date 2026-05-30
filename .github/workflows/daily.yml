@@ -7,15 +7,21 @@ on:
 jobs:
   update:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install numpy pandas matplotlib baostock
-      - run: python3 scripts/pages_gen.py
-      - uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./
-          keep_files: false
+      - run: pip install numpy pandas matplotlib akshare
+      - run: python3 gen_pages.py
+      - run: |
+          cp index.html docs/
+          cp performance.png docs/
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/index.html docs/performance.png
+          git diff --quiet && git diff --staged --quiet || git commit -m "auto update $(date +%Y-%m-%d)"
+          git push
